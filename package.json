@@ -17,6 +17,7 @@
     "discord.js": "^14.18.0"
   },
   "scripts": {
-    "dev": "bun run --watch src/bot.ts"
+    "dev": "bun run --watch src/bot.ts",
+    "start": "bun run src/bot.ts"
   }
 }
