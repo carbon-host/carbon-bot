@@ -1,0 +1,22 @@
+{
+  "name": "carbon-bot",
+  "module": "index.ts",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^1.1.25",
+    "@ai-sdk/openai": "^1.2.5",
+    "ai": "^4.1.61",
+    "discord.js": "^14.18.0"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/bot.ts"
+  }
+}
