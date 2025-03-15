@@ -70,8 +70,9 @@ export function shouldPingSupport(userId: string): boolean {
  * Remove mentions of @everyone and @here from a message
  */
 export function removeBannedMentions(text: string): string {
+  
   // Replace @everyone and @here with safe versions
-  return text.replace(/@everyone/gi, "`everyone`").replace(/@here/gi, "`here`");
+  return text.replace(/@everyone/gi, "everyone").replace(/@here/gi, "here");
 }
 
 /**

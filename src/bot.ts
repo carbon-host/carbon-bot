@@ -27,6 +27,9 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
+  allowedMentions: {
+    parse: [],
+  },
 });
 
 // listen for the client to be ready
@@ -88,10 +91,12 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // Generate response using the full conversation history
-    const { text } = await generateText({
-      model: google(AI_CONFIG.DEFAULT_MODEL),
-      messages: conversationHistory,
-    });
+    // const { text } = await generateText({
+    //   model: google(AI_CONFIG.DEFAULT_MODEL),
+    //   messages: conversationHistory,
+    // });
+
+    const text = "@everyone @here @dawsson";
 
     // Add the assistant's response to conversation memory
     addAssistantResponse(message.channel.id, text);
