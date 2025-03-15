@@ -83,7 +83,7 @@ export function addSupportPingIfNeeded(
   shouldPing: boolean
 ): string {
   if (shouldPing) {
-    return `<@&${process.env.SUPPORT_ROLE_ID}> (Auto-ping due to high message frequency)\n\n${text}`;
+    return `<@&${Bun.env.SUPPORT_ROLE_ID}> (Auto-ping due to high message frequency)\n\n${text}`;
   }
   return text;
 }
