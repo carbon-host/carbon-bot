@@ -16,7 +16,7 @@ interface RateLimitConfig {
 export const RATE_LIMIT: RateLimitConfig = {
   maxMessages: 5,
   timeWindow: 60 * 1000, // 1 minute
-  supportPingThreshold: 5,
+  supportPingThreshold: 4,
   quickSuccessionWindow: 30 * 1000, // 30 seconds
 };
 
@@ -70,7 +70,6 @@ export function shouldPingSupport(userId: string): boolean {
  * Remove mentions of @everyone and @here from a message
  */
 export function removeBannedMentions(text: string): string {
-  
   // Replace @everyone and @here with safe versions
   return text.replace(/@everyone/gi, "everyone").replace(/@here/gi, "here");
 }
