@@ -14,7 +14,8 @@
     "@ai-sdk/google": "^1.1.25",
     "@ai-sdk/openai": "^1.2.5",
     "ai": "^4.1.61",
-    "discord.js": "^14.18.0"
+    "discord.js": "^14.18.0",
+    "lowdb": "^7.0.1"
   },
   "scripts": {
     "dev": "bun run --watch src/bot.ts",

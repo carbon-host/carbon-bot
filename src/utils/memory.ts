@@ -1,10 +1,15 @@
 import { Message } from "discord.js";
-import { MEMORY_CONFIG, BOT_CONFIG } from "./config";
 import { saveConversations, loadConversations } from "./storage";
+
+// Maximum number of messages to keep in memory per channel
+const MAX_MESSAGES = 15;
+
+// Time in milliseconds after which a conversation is considered expired (3 hours)
+const CONVERSATION_EXPIRY = 3 * 60 * 60 * 1000;
 
 // Define the structure for a conversation message
 export interface ConversationMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: string;
   timestamp?: Date;
 }
@@ -22,9 +27,6 @@ const conversations = loadConversations();
 const SAVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 setInterval(() => {
   saveConversations(conversations);
-  if (BOT_CONFIG.LOG_CONVERSATIONS) {
-    console.log(`[Storage] Saved ${conversations.size} conversations to disk`);
-  }
 }, SAVE_INTERVAL);
 
 // Save conversations on process exit
@@ -63,11 +65,6 @@ export function addUserMessage(message: Message): void {
 
   // Save the updated conversation
   conversations.set(channelId, conversation);
-
-  // Log conversation if enabled
-  if (BOT_CONFIG.LOG_CONVERSATIONS) {
-    console.log(`[User Message] ${message.author.tag}: ${message.content}`);
-  }
 }
 
 /**
@@ -92,11 +89,6 @@ export function addAssistantResponse(channelId: string, content: string): void {
 
   // Save the updated conversation
   conversations.set(channelId, conversation);
-
-  // Log conversation if enabled
-  if (BOT_CONFIG.LOG_CONVERSATIONS) {
-    console.log(`[Assistant Response]: ${content}`);
-  }
 }
 
 /**
@@ -113,39 +105,6 @@ export function getConversationHistory(
   }
 
   return conversation.messages;
-}
-
-/**
- * Get a formatted string of the conversation history for display
- */
-export function getFormattedHistory(channelId: string): string {
-  const history = getConversationHistory(channelId);
-
-  if (history.length === 0) {
-    return "No conversation history found.";
-  }
-
-  return history
-    .map((msg) => {
-      const timestamp = msg.timestamp
-        ? `[${new Date(msg.timestamp).toLocaleTimeString()}] `
-        : "";
-      const role = msg.role === "user" ? "User" : "Assistant";
-      return `${timestamp}**${role}**: ${msg.content.substring(0, 100)}${
-        msg.content.length > 100 ? "..." : ""
-      }`;
-    })
-    .join("\n\n");
-}
-
-/**
- * Clear the conversation history for a channel
- */
-export function clearConversation(channelId: string): void {
-  conversations.delete(channelId);
-
-  // Save immediately after clearing
-  saveConversations(conversations);
 }
 
 /**
@@ -172,8 +131,7 @@ function getOrCreateConversation(channelId: string): Conversation {
 function isConversationExpired(conversation: Conversation): boolean {
   const now = new Date();
   return (
-    now.getTime() - conversation.lastUpdated.getTime() >
-    MEMORY_CONFIG.CONVERSATION_EXPIRY
+    now.getTime() - conversation.lastUpdated.getTime() > CONVERSATION_EXPIRY
   );
 }
 
@@ -181,23 +139,8 @@ function isConversationExpired(conversation: Conversation): boolean {
  * Trim a conversation to the maximum length
  */
 function trimConversation(conversation: Conversation): void {
-  if (conversation.messages.length > MEMORY_CONFIG.MAX_MESSAGES) {
+  if (conversation.messages.length > MAX_MESSAGES) {
     // Keep the most recent messages
-    conversation.messages = conversation.messages.slice(
-      -MEMORY_CONFIG.MAX_MESSAGES
-    );
+    conversation.messages = conversation.messages.slice(-MAX_MESSAGES);
   }
-}
-
-/**
- * Add the system prompt to the conversation history
- */
-export function getConversationWithSystemPrompt(
-  channelId: string,
-  systemPrompt: string
-): ConversationMessage[] {
-  const history = getConversationHistory(channelId);
-
-  // Add the system prompt at the beginning
-  return [{ role: "system", content: systemPrompt }, ...history];
 }

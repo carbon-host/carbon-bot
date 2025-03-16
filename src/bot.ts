@@ -3,18 +3,17 @@ import { SYSTEM_PROMPT } from "@/utils/prompt";
 import {
   addUserMessage,
   addAssistantResponse,
-  getConversationWithSystemPrompt,
-  clearConversation,
-  getFormattedHistory,
+  getConversationHistory,
 } from "@/utils/memory";
-import { MEMORY_CONFIG, AI_CONFIG, BOT_CONFIG } from "@/utils/config";
 import {
   isRateLimited,
-  addMessageTimestamp,
+  trackUserMessage,
   shouldPingSupport,
-  removeBannedMentions,
+  sanitizeResponse,
   addSupportPingIfNeeded,
   requiresResponse,
+  aiRequestedSupportPing,
+  aiIndicatedNoResponse,
 } from "@/utils/safety";
 import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
@@ -41,6 +40,9 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.channel.id !== Bun.env.SUPPORT_CHANNEL_ID) return;
   if (message.author.bot) return;
 
+  // Track message for rate limiting
+  trackUserMessage(message.author.id);
+
   // Check if user is rate limited
   if (isRateLimited(message.author.id)) {
     await message.reply(
@@ -49,88 +51,63 @@ client.on(Events.MessageCreate, async (message) => {
     return;
   }
 
-  // Add message timestamp for rate limiting
-  addMessageTimestamp(message.author.id);
+  // Add message to conversation memory
+  addUserMessage(message);
 
   // Check if the message requires a response
   if (!requiresResponse(message.content)) {
-    // Still add to conversation memory but don't respond
-    addUserMessage(message);
-    return;
+    return; // Don't respond if not needed
   }
 
-  // Add the user's message to conversation memory
-  addUserMessage(message);
-
-  // Get the conversation history with system prompt
-  const conversationHistory = getConversationWithSystemPrompt(
-    message.channel.id,
-    SYSTEM_PROMPT
-  );
+  // Get conversation history
+  const conversationHistory = getConversationHistory(message.channel.id);
 
   try {
-    // Set typing indicator while processing
-    if (BOT_CONFIG.SHOW_TYPING) {
-      await message.channel.sendTyping();
-    }
+    // Show typing indicator
+    await message.channel.sendTyping();
 
-    // Generate response using the full conversation history
+    // Generate response using the conversation history
     const { text } = await generateText({
-      model: google(AI_CONFIG.DEFAULT_MODEL),
+      model: google("gemini-2.0-flash-001"),
+      system: SYSTEM_PROMPT,
       messages: conversationHistory,
     });
 
-    // Add the assistant's response to conversation memory
-    addAssistantResponse(message.channel.id, text);
+    // Check if AI indicated no response was needed
+    if (aiIndicatedNoResponse(text)) {
+      console.log("AI indicated no response was needed");
+      return; // Don't respond
+    }
 
-    // Check if we should ping support
-    const needsSupportPing = shouldPingSupport(message.author.id);
+    // Add the response to conversation memory (after removing directives)
+    const cleanedText = sanitizeResponse(text);
+    addAssistantResponse(message.channel.id, cleanedText);
 
-    // Remove banned mentions and add support ping if needed
-    const safeText = removeBannedMentions(text);
-    const finalText = addSupportPingIfNeeded(safeText, needsSupportPing);
+    // Check if we should ping support (programmatic check or AI directive)
+    const shouldPingProgrammatic = shouldPingSupport(
+      message.author.id,
+      message.content
+    );
+    const shouldPingByAI = aiRequestedSupportPing(text);
+    const needsSupportPing = shouldPingProgrammatic || shouldPingByAI;
+
+    // Reason for support ping (for logging)
+    if (shouldPingByAI) {
+      console.log("Support ping requested by AI");
+    } else if (shouldPingProgrammatic) {
+      console.log("Support ping determined programmatically");
+    }
+
+    // Add support ping if needed
+    const finalText = addSupportPingIfNeeded(cleanedText, needsSupportPing);
 
     // Reply to the user
     await message.reply(finalText);
   } catch (error) {
-    if (BOT_CONFIG.LOG_ERRORS) {
-      console.error("Error generating response:", error);
-    }
-
-    try {
-      // Try with fallback model if available
-      if (AI_CONFIG.FALLBACK_MODEL) {
-        if (BOT_CONFIG.SHOW_TYPING) {
-          await message.channel.sendTyping();
-        }
-
-        const { text } = await generateText({
-          model: google(AI_CONFIG.FALLBACK_MODEL),
-          messages: conversationHistory,
-        });
-
-        // Add the assistant's response to conversation memory
-        addAssistantResponse(message.channel.id, text);
-
-        // Remove banned mentions and add support ping if needed
-        const safeText = removeBannedMentions(text);
-        const finalText = addSupportPingIfNeeded(
-          safeText,
-          shouldPingSupport(message.author.id)
-        );
-
-        await message.reply(finalText);
-      } else {
-        throw new Error("No fallback model available");
-      }
-    } catch (fallbackError) {
-      if (BOT_CONFIG.LOG_ERRORS) {
-        console.error("Fallback model error:", fallbackError);
-      }
-      await message.reply(
-        "I'm having trouble processing your request right now. Please try again later."
-      );
-    }
+    console.error("Error generating response:", error);
+    await message.reply(
+      "I'm having trouble processing your request right now. Please try again later."
+    );
   }
 });
 

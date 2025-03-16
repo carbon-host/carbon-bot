@@ -1,5 +1,7 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
+import { existsSync, mkdirSync } from "fs";
+import { Low } from "lowdb";
+import { JSONFile } from "lowdb/node";
 import type { ConversationMessage } from "./memory";
 
 // Define the storage directory
@@ -10,54 +12,36 @@ if (!existsSync(STORAGE_DIR)) {
   mkdirSync(STORAGE_DIR, { recursive: true });
 }
 
-/**
- * Save data to a JSON file
- */
-export function saveData<T>(filename: string, data: T): void {
-  try {
-    const filePath = join(STORAGE_DIR, `${filename}.json`);
-    writeFileSync(filePath, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error(`Error saving data to ${filename}.json:`, error);
-  }
-}
+// Database file path
+const DB_FILE = join(STORAGE_DIR, "conversations.json");
 
-/**
- * Load data from a JSON file
- */
-export function loadData<T>(filename: string, defaultValue: T): T {
-  try {
-    const filePath = join(STORAGE_DIR, `${filename}.json`);
-
-    if (!existsSync(filePath)) {
-      return defaultValue;
-    }
-
-    const data = readFileSync(filePath, "utf-8");
-    return JSON.parse(data) as T;
-  } catch (error) {
-    console.error(`Error loading data from ${filename}.json:`, error);
-    return defaultValue;
-  }
-}
-
-/**
- * Interface for conversation storage
- */
-export interface ConversationStorage {
-  [channelId: string]: {
-    messages: ConversationMessage[];
-    lastUpdated: string; // ISO date string
+// Define the database schema
+interface Database {
+  conversations: {
+    [channelId: string]: {
+      messages: ConversationMessage[];
+      lastUpdated: string; // ISO date string
+    };
   };
 }
 
+// Create database instance
+const adapter = new JSONFile<Database>(DB_FILE);
+const db = new Low<Database>(adapter, { conversations: {} });
+
+// Initialize db by reading from file
+(async () => {
+  await db.read();
+  db.data ||= { conversations: {} };
+})();
+
 /**
- * Save conversations to storage
+ * Save conversations to the database
  */
 export function saveConversations(conversations: Map<string, any>): void {
-  const data: ConversationStorage = {};
-
   // Convert Map to a plain object for storage
+  const data: Database["conversations"] = {};
+
   conversations.forEach((conversation, channelId) => {
     data[channelId] = {
       messages: conversation.messages,
@@ -65,18 +49,21 @@ export function saveConversations(conversations: Map<string, any>): void {
     };
   });
 
-  saveData("conversations", data);
+  // Save to db
+  db.data.conversations = data;
+
+  // Write to file (async but we don't need to wait)
+  db.write().catch((err) => console.error("Error writing to database:", err));
 }
 
 /**
- * Load conversations from storage
+ * Load conversations from the database
  */
 export function loadConversations(): Map<string, any> {
-  const data = loadData<ConversationStorage>("conversations", {});
   const conversations = new Map<string, any>();
 
   // Convert plain object back to Map
-  Object.entries(data).forEach(([channelId, conversation]) => {
+  Object.entries(db.data.conversations).forEach(([channelId, conversation]) => {
     conversations.set(channelId, {
       messages: conversation.messages,
       lastUpdated: new Date(conversation.lastUpdated),

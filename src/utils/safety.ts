@@ -1,77 +1,124 @@
 import { Message } from "discord.js";
 
-// Rate limiting configuration
-interface RateLimitConfig {
-  // Maximum number of messages per user in the time window
-  maxMessages: number;
-  // Time window in milliseconds
-  timeWindow: number;
-  // Support ping threshold - number of messages in quick succession to trigger support ping
-  supportPingThreshold: number;
-  // Quick succession time window in milliseconds
-  quickSuccessionWindow: number;
+// User message tracker for rate limiting
+interface UserTracker {
+  timestamps: number[];
+  lastActivity: number;
 }
 
-// Default rate limit settings
-export const RATE_LIMIT: RateLimitConfig = {
-  maxMessages: 15,
-  timeWindow: 2 * 60 * 1000, // 2 minutes
-  supportPingThreshold: 10,
-  quickSuccessionWindow: 30 * 1000, // 30 seconds
-};
-
 // Store user message timestamps for rate limiting
-const userMessages: Map<string, number[]> = new Map();
+const userMessages = new Map<string, UserTracker>();
+
+// Rate limit settings
+const MAX_MESSAGES = 15;
+const TIME_WINDOW = 2 * 60 * 1000; // 2 minutes
+const SUPPORT_THRESHOLD = 10;
+const QUICK_SUCCESSION_WINDOW = 30 * 1000; // 30 seconds
+
+// Response control directives
+const PING_SUPPORT_DIRECTIVE = "[[PING_SUPPORT]]";
+const NO_RESPONSE_DIRECTIVE = "[[NO_RESPONSE_NEEDED]]";
 
 /**
  * Check if a user is rate limited
  */
 export function isRateLimited(userId: string): boolean {
   const now = Date.now();
-  const userTimestamps = userMessages.get(userId) || [];
+  const user = userMessages.get(userId) || {
+    timestamps: [],
+    lastActivity: now,
+  };
 
-  // Filter timestamps to only include those within the time window
-  const recentTimestamps = userTimestamps.filter(
-    (timestamp) => now - timestamp < RATE_LIMIT.timeWindow
+  // Clean up old timestamps
+  user.timestamps = user.timestamps.filter(
+    (timestamp) => now - timestamp < TIME_WINDOW
   );
 
-  // Update the timestamps
-  userMessages.set(userId, recentTimestamps);
+  // Update user data
+  userMessages.set(userId, user);
 
-  // Check if the user has exceeded the rate limit
-  return recentTimestamps.length >= RATE_LIMIT.maxMessages;
+  // Check if user has exceeded rate limit
+  return user.timestamps.length >= MAX_MESSAGES;
 }
 
 /**
  * Add a message timestamp for a user
  */
-export function addMessageTimestamp(userId: string): void {
-  const timestamps = userMessages.get(userId) || [];
-  timestamps.push(Date.now());
-  userMessages.set(userId, timestamps);
+export function trackUserMessage(userId: string): void {
+  const now = Date.now();
+  const user = userMessages.get(userId) || {
+    timestamps: [],
+    lastActivity: now,
+  };
+
+  user.timestamps.push(now);
+  user.lastActivity = now;
+
+  userMessages.set(userId, user);
 }
 
 /**
- * Check if support should be pinged based on message frequency
+ * Determine if the message content should trigger a support ping
+ * Either due to high message frequency or content analysis
  */
-export function shouldPingSupport(userId: string): boolean {
+export function shouldPingSupport(userId: string, content: string): boolean {
   const now = Date.now();
-  const userTimestamps = userMessages.get(userId) || [];
+  const user = userMessages.get(userId);
+
+  if (!user) return false;
 
   // Count messages in quick succession
-  const quickSuccessionCount = userTimestamps.filter(
-    (timestamp) => now - timestamp < RATE_LIMIT.quickSuccessionWindow
+  const quickMessages = user.timestamps.filter(
+    (timestamp) => now - timestamp < QUICK_SUCCESSION_WINDOW
   ).length;
 
-  return quickSuccessionCount >= RATE_LIMIT.supportPingThreshold;
+  // Check for urgent keywords in message content
+  const urgentKeywords = [
+    "urgent",
+    "emergency",
+    "critical",
+    "immediately",
+    "help!!!",
+    "broken",
+  ];
+  const containsUrgentKeywords = urgentKeywords.some((word) =>
+    content.toLowerCase().includes(word)
+  );
+
+  // Ping support if user is sending many messages quickly or using urgent language
+  return quickMessages >= SUPPORT_THRESHOLD || containsUrgentKeywords;
 }
 
 /**
- * Remove mentions of @everyone and @here from a message
+ * Check if AI response contains directive to ping support
  */
-export function removeBannedMentions(text: string): string {
-  // Replace @everyone and @here with safe versions
-  return text.replace(/@everyone/gi, "everyone").replace(/@here/gi, "here");
+export function aiRequestedSupportPing(text: string): boolean {
+  return text.includes(PING_SUPPORT_DIRECTIVE);
+}
+
+/**
+ * Check if AI indicated no response was needed
+ */
+export function aiIndicatedNoResponse(text: string): boolean {
+  return text.includes(NO_RESPONSE_DIRECTIVE);
+}
+
+/**
+ * Sanitize AI response to remove problematic content and directives
+ */
+export function sanitizeResponse(text: string): string {
+  return (
+    text
+      // Remove directives
+      .replace(PING_SUPPORT_DIRECTIVE, "")
+      .replace(NO_RESPONSE_DIRECTIVE, "")
+      // Remove @everyone and @here mentions
+      .replace(/@everyone/gi, "everyone")
+      .replace(/@here/gi, "here")
+      // Move code blocks to new line
+      .replace(/```\s*$/g, "```\n")
+      .trim()
+  );
 }
 
 /**
@@ -82,28 +129,28 @@ export function addSupportPingIfNeeded(
   shouldPing: boolean
 ): string {
   if (shouldPing) {
-    return `<@&${Bun.env.SUPPORT_ROLE_ID}> (Auto-ping due to high message frequency)\n\n${text}`;
+    return `<@&${Bun.env.SUPPORT_ROLE_ID}> (Support needed - high message frequency or urgent issue)\n\n${text}`;
   }
   return text;
 }
 
 /**
- * Check if a message requires a response
- * Returns true if the message is a question or appears to need a response
+ * Determine if a user message requires a response
  */
 export function requiresResponse(message: string): boolean {
-  const trimmedMessage = message.trim().toLowerCase();
+  const content = message.trim().toLowerCase();
 
-  // Check if message ends with a question mark
-  if (trimmedMessage.endsWith("?")) {
+  // Always respond if bot is mentioned
+  if (content.includes("<@1264764063305437244>")) {
     return true;
   }
 
-  if (trimmedMessage.includes("<@1264764063305437244>") ) {
+  // Respond to questions (ending with ? or starting with question words)
+  if (content.endsWith("?")) {
     return true;
   }
 
-  // Check for question words at the beginning
+  // Common question starters
   const questionStarters = [
     "what",
     "how",
@@ -124,15 +171,16 @@ export function requiresResponse(message: string): boolean {
     "did",
     "help",
     "what's",
+    "whats",
   ];
 
   for (const starter of questionStarters) {
-    if (trimmedMessage.startsWith(starter + " ")) {
+    if (content.startsWith(starter + " ")) {
       return true;
     }
   }
 
-  // Check for phrases that indicate the user needs help
+  // Help-seeking phrases
   const helpPhrases = [
     "i need help",
     "help me",
@@ -148,13 +196,15 @@ export function requiresResponse(message: string): boolean {
     "support",
     "how do i",
     "how to",
+    "please help",
   ];
 
   for (const phrase of helpPhrases) {
-    if (trimmedMessage.includes(phrase)) {
+    if (content.includes(phrase)) {
       return true;
     }
   }
 
+  // Default to not responding
   return false;
 }
