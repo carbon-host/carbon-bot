@@ -7,12 +7,6 @@ export const MEMORY_CONFIG = {
 
   // Time in milliseconds after which a conversation is considered expired (2 hours)
   CONVERSATION_EXPIRY: 30 * 60 * 1000,
-
-  // Command to clear conversation history
-  CLEAR_COMMAND: "!clear",
-
-  // Command to show conversation history
-  HISTORY_COMMAND: "!history",
 };
 
 /**

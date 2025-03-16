@@ -14,9 +14,9 @@ interface RateLimitConfig {
 
 // Default rate limit settings
 export const RATE_LIMIT: RateLimitConfig = {
-  maxMessages: 5,
-  timeWindow: 60 * 1000, // 1 minute
-  supportPingThreshold: 4,
+  maxMessages: 15,
+  timeWindow: 2 * 60 * 1000, // 2 minutes
+  supportPingThreshold: 10,
   quickSuccessionWindow: 30 * 1000, // 30 seconds
 };
 
@@ -99,6 +99,10 @@ export function requiresResponse(message: string): boolean {
     return true;
   }
 
+  if (trimmedMessage.includes("<@1264764063305437244>") ) {
+    return true;
+  }
+
   // Check for question words at the beginning
   const questionStarters = [
     "what",
@@ -119,6 +123,7 @@ export function requiresResponse(message: string): boolean {
     "does",
     "did",
     "help",
+    "what's",
   ];
 
   for (const starter of questionStarters) {

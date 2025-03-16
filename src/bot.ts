@@ -41,22 +41,6 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.channel.id !== Bun.env.SUPPORT_CHANNEL_ID) return;
   if (message.author.bot) return;
 
-  // Check if the message is a command to clear conversation history
-  if (message.content.trim() === MEMORY_CONFIG.CLEAR_COMMAND) {
-    clearConversation(message.channel.id);
-    await message.reply(
-      "Conversation history cleared! I've forgotten our previous conversation."
-    );
-    return;
-  }
-
-  // Check if the message is a command to show conversation history
-  if (message.content.trim() === MEMORY_CONFIG.HISTORY_COMMAND) {
-    const history = getFormattedHistory(message.channel.id);
-    await message.reply(`**Conversation History**\n\n${history}`);
-    return;
-  }
-
   // Check if user is rate limited
   if (isRateLimited(message.author.id)) {
     await message.reply(
