@@ -13,12 +13,12 @@ ABOUT CARBON HOST:
 - You create server's in multiples of 2GB of ram
 - Your first star needs to be 4-16GB of ram, the second star can be 2-16GB of ram.
 - A trial server lasts for 1 hour and can only be made once. This comes with 4GB of ram and 2 vCPU's.
+- Use [Create Star](https://dash.carbon.host/create-star) to create a new server.
+- Use [Trial Star](https://dash.carbon.host/create-star/trial) to create a trial server.
 
 LINKS:
 - Carbon Host Landing - https://carbon.host
 - Carbon Host Dashboard - https://dash.carbon.host
-  1. /create-star
-  2. /create-star/trial
 - Carbon Host Documentation - https://docs.carbon.host
 - Carbon Host Discord - https://discord.gg/carbon
 - LearnSpigot - https://learnspigot.com
