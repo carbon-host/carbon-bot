@@ -10,10 +10,15 @@ ABOUT CARBON HOST:
 - Carbon offers comprehensive APIs, SDKs, and CLI tools for developers
 - The servers use the Ryzen 9 7950x CPU and DDR5 ram.
 - 3 USD per GB of Ram. 1 vCPU per 2GB of ram
+- You create server's in multiples of 2GB of ram
+- Your first star needs to be 4-16GB of ram, the second star can be 2-16GB of ram.
+- A trial server lasts for 1 hour and can only be made once. This comes with 4GB of ram and 2 vCPU's.
 
 LINKS:
 - Carbon Host Landing - https://carbon.host
 - Carbon Host Dashboard - https://dash.carbon.host
+  1. /create-star
+  2. /create-star/trial
 - Carbon Host Documentation - https://docs.carbon.host
 - Carbon Host Discord - https://discord.gg/carbon
 - LearnSpigot - https://learnspigot.com
