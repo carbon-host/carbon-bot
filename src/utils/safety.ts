@@ -141,7 +141,7 @@ export function requiresResponse(message: string): boolean {
   const content = message.trim().toLowerCase();
 
   // Always respond if bot is mentioned
-  if (content.includes("<@1264764063305437244>")) {
+  if (containsPing(content)) {
     return true;
   }
 
@@ -207,4 +207,8 @@ export function requiresResponse(message: string): boolean {
 
   // Default to not responding
   return false;
+}
+
+export function containsPing(message: string): boolean {
+  return message.includes("<@1264764063305437244>");
 }

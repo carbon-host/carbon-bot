@@ -14,6 +14,7 @@ import {
   requiresResponse,
   aiRequestedSupportPing,
   aiIndicatedNoResponse,
+  containsPing,
 } from "@/utils/safety";
 import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
@@ -37,7 +38,11 @@ client.once(Events.ClientReady, (c) => {
 });
 
 client.on(Events.MessageCreate, async (message) => {
-  if (message.channel.id !== Bun.env.SUPPORT_CHANNEL_ID) return;
+  if (
+    message.channel.id !== Bun.env.SUPPORT_CHANNEL_ID &&
+    !containsPing(message.content)
+  )
+    return;
   if (message.author.bot) return;
 
   // Track message for rate limiting
